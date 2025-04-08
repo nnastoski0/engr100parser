@@ -1,3 +1,6 @@
+// array to store charts so they can be cleared if file changed
+let charts = [];
+
 async function readData() {
     let dataFile = document.getElementById("data-input").files[0];
     const reader = new FileReader();
@@ -11,6 +14,8 @@ function parseData(data) {
     document.getElementById("main").style.display = "flex";
     markers.forEach(marker => marker.setMap(null)); // hide all markers
     markers = []; // clear previous markers
+    charts.forEach(chart => chart.destroy()); // clear all charts
+    charts = [];
 
     data = data.split(/\r?\n|\r|\n/g); // split by line
     data = data.filter(Boolean); // filter out empty lines
@@ -23,6 +28,7 @@ function parseData(data) {
     let timestamps = [];
     let latitudes = [];
     let longitudes = [];
+    let altitudes = [];
 
     for (const bigRow of data) {
         row = bigRow.split(",");
@@ -54,6 +60,8 @@ function parseData(data) {
            let lng = lngDeg + (lngMin / 60);          
            if (row[14] === "W") lng *= -1;
            longitudes.push(lng);
+
+           altitudes.push(row[18]);
         }
     }
 
@@ -64,6 +72,8 @@ function parseData(data) {
     latitudes = latitudes.filter(Boolean);
     longitudes = longitudes.filter(Boolean);
 
+
+    // plot path
     let points = [];
     for (let i = 0; i < latitudes.length; i++) {
         let coord = {lat : latitudes[i], lng : longitudes[i]};
@@ -81,6 +91,14 @@ function parseData(data) {
 
     flightPath.setMap(map);
 
+    // recenter map on line
+    let bounds = new google.maps.LatLngBounds();
+    flightPath.getPath().forEach(x => bounds.extend(x));
+    if (flightPath.getPath().length > 0) map.fitBounds(bounds);
+    else {
+        map.panTo(new google.maps.LatLng(42.27684985412537, -83.73819494482258));
+        map.setZoom(14);
+    }
     // flight time
     let flightTime = (milliseconds[milliseconds.length - 1]) / (1000 * 60 * 60);
     document.getElementById("flight-time").getElementsByTagName("p")[0].innerHTML = Math.trunc(flightTime) + " hours, " + Math.round((flightTime % 1) * 60) + " minutes";
@@ -113,7 +131,33 @@ function parseData(data) {
     document.getElementById("temp-high").getElementsByTagName("p")[0].innerHTML = highTemp + "&deg;C"
     document.getElementById("temp-low").getElementsByTagName("p")[0].innerHTML = lowTemp + "&deg;C"
 
+    // graphs
+    const altitudeTime = new Chart("alt-time", {
+        type: "line",
+        data: {
+            labels: milliseconds.map(x => parseFloat(x)),
+            datasets: [{
+                //backgroundColor: "#a2afbf",
+                pointBackgroundColor: "#a2afbf",
+                borderColor: "#a2afbf",
+                data: altitudes.map(x => parseFloat(x)),
+            }]
+        },
+        options: {
+            legend: {
+                display: false
+            },
+            title: {
+                display: true,
+                text: "Altitude over time (m/ms)"
+            }
+        }
+    });
 
+    charts.push(altitudeTime);
+
+
+    /*
     console.log(milliseconds);
     console.log(externalTemps);
     console.log(internalTemps);
@@ -121,4 +165,6 @@ function parseData(data) {
     console.log(timestamps);
     console.log(latitudes);
     console.log(longitudes);
+    console.log(altitudes);
+    */
 }
